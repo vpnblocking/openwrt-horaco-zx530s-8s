@@ -1,0 +1,41 @@
+realtek: add support for Horaco ZX530S-8S
+
+Add a dedicated device tree and image profile for the Horaco ZX530S-8S.
+Use existing switch, PCS and SFP drivers and generic LAN defaults.
+
+Hardware:
+- Realtek RTL9303, 800 MHz
+- 128 MiB RAM, 16 MiB SPI NOR (Winbond EF4018 on the tested unit)
+- Eight SFP+ ports, MAC indices 0/8/16/20/24/25/26/27, SerDes 2-9
+- RTL8231 GPIO expander and hardware I2C module access
+- Hardware port LEDs and active-low reset button on internal GPIO5
+- Serial console at 115200 baud
+
+Read the per-unit MAC from ethaddr in the BDINFO U-Boot environment.
+Keep stock regions except the 12 MiB RUNTIME partition read-only.
+Name that region firmware and use the uImage splitter with magic
+0x83800000 and the standard kernel-lzma/sysupgrade recipe.
+
+Configure hardware port LEDs from the original board profile. Declare
+reset through gpio-keys and KEY_RESTART with the standard handler.
+Do not embed private VLAN or MTU configuration.
+
+Installation:
+1. Isolate the switch and interrupt original U-Boot with Esc.
+2. Connect a TFTP host to port 1 (tested with a 1G RJ45 SFP).
+3. Set ipaddr/serverip/netmask and clear vlan/nvlan for untagged TFTP.
+   Run rtk network on, rtk 10g 0 fiber1g, rtk ext-devInit 0 and
+   rtk ext-pinSet 0 0 to enable the tested port/module combination.
+4. Load initramfs at 0x82000000, verify length/CRC and bootm there.
+5. Back up all seven stock regions and verify copies off-device.
+6. Transfer sysupgrade to /tmp, verify its hash and run sysupgrade -T,
+   then perform the first installation with sysupgrade -n.
+7. Keep bootcmd unchanged; original boota boots the installed image.
+
+Tested on one RTL9303 revision B unit: RAM and flash boot, NVMEM MAC,
+all eight ports at 1G, 10G links on ports 2/5/6/7/8, L2 VLAN operation,
+jumbo traffic, JFFS2 persistence and upgrade configuration retention.
+Port illumination and reset input polarity were verified; the owner
+reported correct operation after installing the final combined build.
+Near-10G throughput is owner-reported rather than a formal benchmark.
+Stock restoration and destructive factory reset were not explicitly tested.
